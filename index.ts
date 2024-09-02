@@ -1,5 +1,9 @@
 import "dotenv/config";
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import {
+  PutObjectCommand,
+  type PutObjectCommandInput,
+  S3Client,
+} from "@aws-sdk/client-s3";
 
 const s3Client = new S3Client({
   region: process.env.S3_REGION,
@@ -23,20 +27,23 @@ async function fetchAndPut() {
     process.exit(1);
   }
 
+  const contentLength = response.headers.has("content-length")
+    ? Number(response.headers.get("content-length"))
+    : undefined;
+  console.log(`Content-Length: ${contentLength}`);
+
   // This one will fail despite there being no compile-time type errors
-  await s3Client
-    .send(
-      new PutObjectCommand({
-        Bucket: "fetchandputrepro",
-        Key: "image1.webp",
-        Body: response.body,
-        ContentType: "image/webp",
-      })
-    )
-    .then(
-      (data) => console.log(`Etag: ${data.ETag}`),
-      (err) => console.error(`response.body error: ${err}`)
-    );
+  const uploadParams: PutObjectCommandInput = {
+    Bucket: "fetchandputrepro",
+    Key: "image1.webp",
+    Body: response.body,
+    ContentType: "image/webp",
+    ContentLength: contentLength,
+  };
+  await s3Client.send(new PutObjectCommand(uploadParams)).then(
+    (data) => console.log(`Etag: ${data.ETag}`),
+    (err) => console.error(`response.body error: ${err}`)
+  );
 
   // This works, but requires reading the file into memory, which is alright in
   // this example, but would be suboptimal if I had to do this for large videos
